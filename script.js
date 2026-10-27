@@ -30,24 +30,97 @@ function saveAppState(state) {
   return nextState;
 }
 
+function persistCurrentInputs() {
+  const targetInputs = document.querySelectorAll('input, textarea, [data-chat-input]');
+  const snapshot = {};
+
+  targetInputs.forEach((input) => {
+    const key = input.name || input.id || input.getAttribute('aria-label') || 'field';
+    if (input.value && key) {
+      snapshot[key] = input.value;
+    }
+  });
+
+  if (Object.keys(snapshot).length) {
+    saveAppState({ inputs: snapshot });
+  }
+}
+
 function restoreAppState() {
   const state = getAppState();
-  if (!state || !state.lastChat) return;
+  const savedInputs = state?.inputs || {};
 
-  const chatInputs = document.querySelectorAll('textarea, input[type="text"], [data-chat-input]');
-  chatInputs.forEach((input) => {
-    input.value = state.lastChat;
+  Object.entries(savedInputs).forEach(([key, value]) => {
+    const match = document.querySelector(`[name="${CSS.escape(key)}"]`) ||
+      document.getElementById(key) ||
+      document.querySelector(`textarea[aria-label="${CSS.escape(key)}"]`) ||
+      document.querySelector(`input[aria-label="${CSS.escape(key)}"]`);
+
+    if (match && typeof value === 'string') {
+      match.value = value;
+    }
   });
+
+  const newsletterInput = document.querySelector('.newsletter input');
+  if (newsletterInput && state?.newsletterEmail) {
+    newsletterInput.value = state.newsletterEmail;
+  }
 }
 
 function updateCartBadge() {
   const cartCountEls = document.querySelectorAll('.cart-count');
   const cart = getCart();
-  const count = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const count = cart.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
 
   cartCountEls.forEach((el) => {
     el.textContent = count || 10;
   });
+}
+
+function showToast(message, type = 'success') {
+  let toast = document.getElementById('site-toast');
+
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'site-toast';
+    toast.setAttribute('role', 'status');
+    toast.setAttribute('aria-live', 'polite');
+    document.body.appendChild(toast);
+  }
+
+  toast.textContent = message;
+  toast.dataset.type = type;
+  toast.classList.add('visible');
+
+  clearTimeout(showToast.timeoutId);
+  showToast.timeoutId = setTimeout(() => {
+    toast.classList.remove('visible');
+  }, 2500);
+}
+
+function setRevealObserver() {
+  const revealEls = document.querySelectorAll(
+    '.category-tile, .product-card, .media-card, .link-card, .app-panel, .qr-box, .section-heading'
+  );
+
+  if (!('IntersectionObserver' in window)) {
+    revealEls.forEach((el) => el.classList.add('is-visible'));
+    return;
+  }
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    },
+    { threshold: 0.18 }
+  );
+
+  revealEls.forEach((el) => observer.observe(el));
 }
 
 function generateQrCode() {
@@ -77,7 +150,7 @@ async function installPwa() {
   if (!installButton) return;
 
   if (!window.deferredPrompt) {
-    alert('The app is ready in your browser. You can still open this site normally on your phone.');
+    showToast('The app is ready in your browser. You can still open this site normally on your phone.');
     return;
   }
 
@@ -89,29 +162,50 @@ async function installPwa() {
 
 document.addEventListener('DOMContentLoaded', () => {
   restoreAppState();
-
-  const chatInputs = document.querySelectorAll('textarea, input[type="text"], [data-chat-input]');
-  chatInputs.forEach((input) => {
-    input.addEventListener('input', () => {
-      saveAppState({ lastChat: input.value });
-    });
-  });
+  setRevealObserver();
 
   const newsletterForms = document.querySelectorAll('.newsletter');
   newsletterForms.forEach((form) => {
+    const input = form.querySelector('input');
+
+    if (input) {
+      input.addEventListener('input', () => {
+        saveAppState({ newsletterEmail: input.value });
+      });
+    }
+
     form.addEventListener('submit', (event) => {
       event.preventDefault();
       const input = form.querySelector('input');
-      if (input) {
-        input.value = '';
-        input.placeholder = 'Thanks for joining!';
-        saveAppState({ lastChat: '' });
+      if (!input) return;
+
+      if (!input.value.trim() || !input.value.includes('@')) {
+        showToast('Please enter a valid email address.', 'error');
+        input.focus();
+        return;
+      }
+
+      saveAppState({ newsletterEmail: input.value.trim() });
+      input.value = '';
+      input.placeholder = 'Thanks for joining!';
+      showToast('You’re on the list—welcome to the glow!');
+    });
+  });
+
+  const inputFields = document.querySelectorAll('input, textarea, [data-chat-input]');
+  inputFields.forEach((input) => {
+    input.addEventListener('input', () => {
+      if (input.value) {
+        saveAppState({ inputs: { ...(getAppState().inputs || {}), [input.name || input.id || 'email-field']: input.value } });
       }
     });
   });
 
   const affiliateLinks = document.querySelectorAll('.affiliate-link, .link-card');
   affiliateLinks.forEach((link) => {
+    link.setAttribute('target', '_blank');
+    link.setAttribute('rel', 'noopener noreferrer sponsored');
+
     link.addEventListener('click', (event) => {
       const isLocal = link.getAttribute('href')?.startsWith('#');
       if (isLocal) return;
@@ -129,6 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
       link.download = 'plus-size-beauty-qr-code.png';
       link.href = canvas.toDataURL('image/png');
       link.click();
+      showToast('QR code downloaded.');
     });
   }
 
@@ -152,10 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   window.addEventListener('beforeunload', () => {
-    const activeChatInput = document.querySelector('textarea, [data-chat-input]');
-    if (activeChatInput) {
-      saveAppState({ lastChat: activeChatInput.value });
-    }
+    persistCurrentInputs();
   });
 
   generateQrCode();
