@@ -1,4 +1,5 @@
 const cartKey = 'plus-size-beauty-cart';
+const appStateKey = 'plus-size-beauty-app-state';
 
 function getCart() {
   try {
@@ -11,6 +12,32 @@ function getCart() {
 
 function saveCart(cart) {
   localStorage.setItem(cartKey, JSON.stringify(cart));
+}
+
+function getAppState() {
+  try {
+    const data = sessionStorage.getItem(appStateKey);
+    return data ? JSON.parse(data) : {};
+  } catch (error) {
+    return {};
+  }
+}
+
+function saveAppState(state) {
+  const currentState = getAppState();
+  const nextState = { ...currentState, ...state };
+  sessionStorage.setItem(appStateKey, JSON.stringify(nextState));
+  return nextState;
+}
+
+function restoreAppState() {
+  const state = getAppState();
+  if (!state || !state.lastChat) return;
+
+  const chatInputs = document.querySelectorAll('textarea, input[type="text"], [data-chat-input]');
+  chatInputs.forEach((input) => {
+    input.value = state.lastChat;
+  });
 }
 
 function updateCartBadge() {
@@ -61,6 +88,15 @@ async function installPwa() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  restoreAppState();
+
+  const chatInputs = document.querySelectorAll('textarea, input[type="text"], [data-chat-input]');
+  chatInputs.forEach((input) => {
+    input.addEventListener('input', () => {
+      saveAppState({ lastChat: input.value });
+    });
+  });
+
   const newsletterForms = document.querySelectorAll('.newsletter');
   newsletterForms.forEach((form) => {
     form.addEventListener('submit', (event) => {
@@ -69,6 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (input) {
         input.value = '';
         input.placeholder = 'Thanks for joining!';
+        saveAppState({ lastChat: '' });
       }
     });
   });
@@ -112,6 +149,13 @@ document.addEventListener('DOMContentLoaded', () => {
     event.preventDefault();
     window.deferredPrompt = event;
     if (installButton) installButton.hidden = false;
+  });
+
+  window.addEventListener('beforeunload', () => {
+    const activeChatInput = document.querySelector('textarea, [data-chat-input]');
+    if (activeChatInput) {
+      saveAppState({ lastChat: activeChatInput.value });
+    }
   });
 
   generateQrCode();
