@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Plus-Size Beauty logo">
+  <defs>
+    <linearGradient id="g1" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#d96d7a"/>
+      <stop offset="100%" stop-color="#f0d9a9"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="120" fill="#fffaf8"/>
+  <circle cx="256" cy="256" r="168" fill="url(#g1)" opacity="0.95"/>
+  <path d="M160 332c32-62 72-98 96-108 26 12 63 50 96 108-30 10-61 15-96 15s-66-5-96-15zm64-138c14 18 28 28 32 28s18-10 32-28c-15-18-28-28-32-28s-17 10-32 28zm-56 64c14-2 27 4 38 18 8 10 12 22 13 35-22-18-38-28-51-28zm144 25c1-13 5-25 13-35 11-14 24-20 38-18-13 0-29 10-51 28z" fill="#2b1b1b" opacity="0.9"/>
+  <text x="256" y="410" text-anchor="middle" font-size="44" font-family="Arial, sans-serif" font-weight="700" fill="#2b1b1b">PlusSize</text>
+</svg>
